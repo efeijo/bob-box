@@ -3,8 +3,6 @@ package authservice
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
 
 	"authservice/internal/authorization"
 	"authservice/internal/model"
@@ -48,8 +46,7 @@ type Auth struct {
 
 func (a *Auth) GetUserToken(ctx context.Context, username string, password string) (string, error) {
 	user, err := a.store.GetUser(ctx, username)
-	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Println("error while getting user from database", err)
+	if err != nil {
 		return "", err
 	}
 
@@ -65,15 +62,13 @@ func (a *Auth) GetUserToken(ctx context.Context, username string, password strin
 		return "", err
 	}
 
-	fmt.Println(user)
-
-	jwtToken, err := a.validator.CreateToken(user.UserID, nil)
+	jwtToken, err := a.validator.CreateToken(user.Username, nil)
 	if err != nil {
 		return "", err
 	}
 
 	err = a.store.CreateSession(ctx, &model.Session{
-		UID:      user.UserID,
+		UID:      user.Username,
 		JWTToken: jwtToken,
 	})
 
@@ -81,39 +76,38 @@ func (a *Auth) GetUserToken(ctx context.Context, username string, password strin
 	return jwtToken, err
 }
 
-func (a *Auth) InvalidateToken(ctx context.Context, userID string) error {
-	return a.store.DeleteSession(ctx, userID)
+func (a *Auth) InvalidateToken(ctx context.Context, username string) error {
+	return a.store.DeleteSession(ctx, username)
 }
 
 func (a *Auth) ValidateToken(ctx context.Context, jwtToken string) (bool, error) {
 	claimsFromToken, err := a.validator.Validate(jwtToken)
 	if err != nil {
-		return false, errors.New("invalid token")
+		return false, err
 	}
 	session, err := a.store.GetSession(ctx, claimsFromToken.UserID)
 	if err != nil {
-		return false, errors.New("no session found for that token")
+		return false, err
 	}
 	return session.JWTToken == jwtToken, nil
 }
 
 func (a *Auth) CreateUser(ctx context.Context, username string, password string) error {
-	fmt.Println("here")
-	_, err := a.store.GetUser(ctx, username)
+	user, err := a.store.GetUser(ctx, username)
 	if err != nil && !errors.Is(err, redis.Nil) {
-		log.Println("error getting user", err)
 		return err
+	}
+
+	if user != nil {
+		return errors.New("user already exists")
 	}
 
 	encryptedPassword, err := encryptPassword(password)
 	if err != nil {
-		log.Println("error encrypting password", err)
 		return err
 	}
 
 	return a.store.CreateOrSetUser(ctx, &model.User{
-		//TODO: add some uuid
-		UserID:         "SOME ID",
 		Username:       username,
 		HashedPassword: encryptedPassword,
 		LoggedIn:       false,
@@ -124,12 +118,12 @@ func (a *Auth) ListUsers(ctx context.Context) ([]*model.User, error) {
 	return a.store.ListUsers(ctx)
 }
 
-func (a *Auth) DeleteUser(ctx context.Context, userID string) error {
-	user, err := a.store.GetUser(ctx, userID)
-	if err != nil && !errors.Is(err, redis.Nil) {
+func (a *Auth) DeleteUser(ctx context.Context, username string) error {
+	user, err := a.store.GetUser(ctx, username)
+	if err != nil {
 		return err
 	}
-	return a.store.DeleteUser(ctx, user.UserID)
+	return a.store.DeleteUser(ctx, user.Username)
 }
 
 func NewAuthService(validator authorization.Validator, store Store) *Auth {

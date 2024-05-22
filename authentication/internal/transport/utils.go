@@ -29,16 +29,16 @@ func WriteError(w http.ResponseWriter, apiError ApiError) http.HandlerFunc {
 	}
 }
 
-func WriteJson(w http.ResponseWriter, statusCode int, val any) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(statusCode)
-		if val != nil {
-			err := json.NewEncoder(w).Encode(val)
-			if err != nil {
-				log.Println("error encode value o WriteJson", err)
-			}
+func WriteJson(w http.ResponseWriter, statusCode int, val any) {
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if val != nil {
+		err := json.NewEncoder(w).Encode(val)
+		if err != nil {
+			log.Println("error encode value o WriteJson", err)
 		}
-		w.Write([]byte{})
 	}
+	w.Write([]byte{})
+
 }

@@ -21,7 +21,7 @@ func (rdb *Redis) GetUser(ctx context.Context, userID string) (*model.User, erro
 }
 
 func (rdb *Redis) CreateOrSetUser(ctx context.Context, user *model.User) error {
-	return rdb.db.Set(ctx, UsersKey+user.UserID, user, 0).Err()
+	return rdb.db.Set(ctx, UsersKey+user.Username, user, 0).Err()
 }
 
 func (rdb *Redis) ListUsers(ctx context.Context) ([]*model.User, error) {

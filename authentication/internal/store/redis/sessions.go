@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"authservice/internal/model"
@@ -18,14 +19,15 @@ func (rdb *Redis) CreateSession(ctx context.Context, session *model.Session) err
 }
 
 func (rdb *Redis) GetSession(ctx context.Context, userID string) (*model.Session, error) {
-	var session *model.Session
+	var session model.Session
 
 	bytes, err := rdb.db.Get(ctx, SessionKey+userID).Bytes()
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("get session", session, err, bytes)
 
-	return session, json.Unmarshal(bytes, session)
+	return &session, json.Unmarshal(bytes, &session)
 }
 
 func (rdb *Redis) DeleteSession(ctx context.Context, userID string) error {

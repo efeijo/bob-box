@@ -2,6 +2,7 @@ package transport
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"authservice/internal/authservice"
+	"authservice/internal/model"
 )
 
 type Server struct {
@@ -38,16 +40,27 @@ func (s *Server) createAuthSubRouter() *chi.Mux {
 
 	subRouter.Post("/token", s.getToken)
 	subRouter.Delete("/token", s.invalidateToken)
-	subRouter.Get("/token", s.validateToken)
+	subRouter.Get("/token/{jwt_token}", s.validateToken)
 
 	return subRouter
 }
 
+type UserAuth struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
 func (s *Server) getToken(w http.ResponseWriter, req *http.Request) {
-	token, err := s.authService.GetUserToken(req.Context(), "Emanuel", "1234567")
+	var userAuth UserAuth
+	err := json.NewDecoder(req.Body).Decode(&userAuth)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	token, err := s.authService.GetUserToken(req.Context(), userAuth.Username, userAuth.Password)
 	if err != nil {
 		log.Println("error getting user token", err)
-		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -60,9 +73,14 @@ func (s *Server) getToken(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Server) createUserHandler(w http.ResponseWriter, req *http.Request) {
-	err := s.authService.CreateUser(req.Context(), "Emanuel", "1234567")
+	var userAuth UserAuth
+	err := json.NewDecoder(req.Body).Decode(&userAuth)
 	if err != nil {
-		log.Println("error creating user password", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = s.authService.CreateUser(req.Context(), userAuth.Username, userAuth.Password)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -71,8 +89,17 @@ func (s *Server) createUserHandler(w http.ResponseWriter, req *http.Request) {
 	WriteJson(w, http.StatusCreated, nil)
 }
 
+type DeleteUserRequest struct {
+	Username string `json:"username,omitempty"`
+}
+
 func (s *Server) deleteUser(w http.ResponseWriter, req *http.Request) {
-	err := s.authService.DeleteUser(req.Context(), "Emanuel")
+	var deleteRequest DeleteUserRequest
+	err := json.NewDecoder(req.Body).Decode(&deleteRequest)
+	if err != nil {
+		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusBadRequest})
+	}
+	err = s.authService.DeleteUser(req.Context(), deleteRequest.Username)
 	if err != nil {
 		log.Println("error deleting user")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -80,24 +107,29 @@ func (s *Server) deleteUser(w http.ResponseWriter, req *http.Request) {
 	WriteJson(w, http.StatusOK, []byte{})
 }
 
+type InvalidateToken struct {
+	Username string `json:"username,omitempty"`
+}
+
 func (s *Server) invalidateToken(w http.ResponseWriter, req *http.Request) {
-	s.authService.InvalidateToken(req.Context(), "Emanuel")
+	// TODO: read user from token and deletes it
+	var invalidateRequest InvalidateToken
+	err := json.NewDecoder(req.Body).Decode(&invalidateRequest)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	s.authService.InvalidateToken(req.Context(), invalidateRequest.Username)
 }
 
 func (s *Server) listUsersHandler(w http.ResponseWriter, req *http.Request) {
 	users, err := s.authService.ListUsers(req.Context())
 	if err != nil {
-		WriteError(w, ApiError{httpStatusCode: http.StatusInternalServerError, err: err})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	if users == nil {
-		WriteJson(w, http.StatusOK, []string{})
+		users = []*model.User{}
 	}
-	err = json.NewEncoder(w).Encode(users)
-	if err != nil {
-		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
-	}
-
 	WriteJson(w, http.StatusOK, users)
 }
 
@@ -106,9 +138,14 @@ func (s *Server) ListenAndServe() error {
 }
 
 func (s *Server) validateToken(w http.ResponseWriter, req *http.Request) {
-	isValid, err := s.authService.ValidateToken(req.Context(), "token here")
+	token := chi.URLParam(req, "jwt_token")
+	fmt.Println(token)
+
+	isValid, err := s.authService.ValidateToken(req.Context(), token)
+	fmt.Println(isValid, err)
 	if err != nil {
-		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	WriteJson(w, http.StatusOK,

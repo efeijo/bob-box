@@ -8,7 +8,6 @@ type User struct {
 	Username       string `json:"username,omitempty"`
 	HashedPassword string `json:"password,omitempty"`
 	LoggedIn       bool   `json:"logged_in,omitempty"`
-	UserID         string `json:"user_id,omitempty"`
 }
 
 func (u *User) UnmarshalBinary(data []byte) error {
