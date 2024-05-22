@@ -1,4 +1,4 @@
-package store
+package redis
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 
 // https://github.com/redis/go-redis/blob/master/example/scan-struct/main.go
 
-func (rdb *Redis) GetUser(ctx context.Context, username string) (*model.User, error) {
-	res, err := rdb.db.Get(ctx, UsersKey+username).Bytes()
+func (rdb *Redis) GetUser(ctx context.Context, userID string) (*model.User, error) {
+	res, err := rdb.db.Get(ctx, UsersKey+userID).Bytes()
 	if err != nil {
 		return nil, err
 	}
@@ -21,7 +21,7 @@ func (rdb *Redis) GetUser(ctx context.Context, username string) (*model.User, er
 }
 
 func (rdb *Redis) CreateOrSetUser(ctx context.Context, user *model.User) error {
-	return rdb.db.Set(ctx, UsersKey+user.Username, user, 0).Err()
+	return rdb.db.Set(ctx, UsersKey+user.UserID, user, 0).Err()
 }
 
 func (rdb *Redis) ListUsers(ctx context.Context) ([]*model.User, error) {
@@ -48,6 +48,6 @@ func (rdb *Redis) ListUsers(ctx context.Context) ([]*model.User, error) {
 	return users, nil
 }
 
-func (rdb *Redis) DeleteUser(ctx context.Context, username string) error {
-	return rdb.db.Del(ctx, UsersKey+username).Err()
+func (rdb *Redis) DeleteUser(ctx context.Context, userID string) error {
+	return rdb.db.Del(ctx, UsersKey+userID).Err()
 }

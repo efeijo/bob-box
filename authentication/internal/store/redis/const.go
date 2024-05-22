@@ -1,4 +1,4 @@
-package store
+package redis
 
 const (
 	SessionKey = "auth:session:"

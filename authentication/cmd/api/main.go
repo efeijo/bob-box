@@ -3,19 +3,20 @@ package main
 import (
 	"log"
 
-	"authservice/internal/authorization/jwt_auth"
+	"authservice/internal/authorization/jwt"
 	"authservice/internal/authservice"
-	"authservice/internal/store"
+	"authservice/internal/store/redis"
 	"authservice/internal/transport"
 )
 
 func main() {
+	secret := []byte("some-secret")
 
-	client := store.NewRedisClient()
+	client := redis.NewClient()
 
-	jwtValidator := jwt_auth.NewJwtValidator(
-		jwt_auth.JwtValidatorConfig{
-			Secret: []byte("some-secret"),
+	jwtValidator := jwt.NewValidator(
+		jwt.ValidatorConfig{
+			Secret: secret,
 		},
 	)
 

@@ -2,7 +2,7 @@ package transport
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -46,75 +46,59 @@ func (s *Server) createAuthSubRouter() *chi.Mux {
 func (s *Server) getToken(w http.ResponseWriter, req *http.Request) {
 	token, err := s.authService.GetUserToken(req.Context(), "Emanuel", "1234567")
 	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
+		log.Println("error getting user token", err)
+		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
 		return
 	}
 
-	err = json.NewEncoder(w).Encode(
-		struct {
-			JwtToken string `json:"jwt_token"`
-		}{
-			JwtToken: token,
-		},
-	)
+	WriteJson(w, http.StatusCreated, struct {
+		JwtToken string `json:"jwt_token"`
+	}{
+		JwtToken: token,
+	})
 
-	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	return
 }
 
 func (s *Server) createUserHandler(w http.ResponseWriter, req *http.Request) {
 	err := s.authService.CreateUser(req.Context(), "Emanuel", "1234567")
 	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
+		log.Println("error creating user password", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	log.Println("writing response on createUserHandler")
+	WriteJson(w, http.StatusCreated, nil)
 }
 
 func (s *Server) deleteUser(w http.ResponseWriter, req *http.Request) {
 	err := s.authService.DeleteUser(req.Context(), "Emanuel")
 	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
-		return
+		log.Println("error deleting user")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	WriteJson(w, http.StatusOK, []byte{})
 }
 
 func (s *Server) invalidateToken(w http.ResponseWriter, req *http.Request) {
-	err := s.authService.InvalidateToken(req.Context(), "Emanuel")
-	if err != nil {
-		ApiError(w, err, http.StatusNotFound)
-		return
-	}
+	s.authService.InvalidateToken(req.Context(), "Emanuel")
 }
 
 func (s *Server) listUsersHandler(w http.ResponseWriter, req *http.Request) {
 	users, err := s.authService.ListUsers(req.Context())
 	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
-		return
+		WriteError(w, ApiError{httpStatusCode: http.StatusInternalServerError, err: err})
 	}
 
 	if users == nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("[]"))
-		return
+		WriteJson(w, http.StatusOK, []string{})
 	}
 	err = json.NewEncoder(w).Encode(users)
 	if err != nil {
-		ApiError(w, err, http.StatusInternalServerError)
-		return
+		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	WriteJson(w, http.StatusOK, users)
 }
 
 func (s *Server) ListenAndServe() error {
@@ -124,7 +108,14 @@ func (s *Server) ListenAndServe() error {
 func (s *Server) validateToken(w http.ResponseWriter, req *http.Request) {
 	isValid, err := s.authService.ValidateToken(req.Context(), "token here")
 	if err != nil {
-		return
+		WriteError(w, ApiError{err: err, httpStatusCode: http.StatusInternalServerError})
 	}
-	fmt.Println(isValid)
+
+	WriteJson(w, http.StatusOK,
+		struct {
+			IsValid bool
+		}{
+			IsValid: isValid,
+		},
+	)
 }

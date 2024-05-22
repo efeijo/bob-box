@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 
 	"authservice/internal/authorization"
 	"authservice/internal/model"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type AuthService interface {
@@ -47,7 +48,7 @@ type Auth struct {
 
 func (a *Auth) GetUserToken(ctx context.Context, username string, password string) (string, error) {
 	user, err := a.store.GetUser(ctx, username)
-	if err != nil {
+	if err != nil && !errors.Is(err, redis.Nil) {
 		log.Println("error while getting user from database", err)
 		return "", err
 	}
@@ -66,13 +67,13 @@ func (a *Auth) GetUserToken(ctx context.Context, username string, password strin
 
 	fmt.Println(user)
 
-	jwtToken, err := a.validator.CreateToken(user.UserId, time.Hour)
+	jwtToken, err := a.validator.CreateToken(user.UserID, nil)
 	if err != nil {
 		return "", err
 	}
 
 	err = a.store.CreateSession(ctx, &model.Session{
-		UID:      user.UserId,
+		UID:      user.UserID,
 		JWTToken: jwtToken,
 	})
 
@@ -85,11 +86,11 @@ func (a *Auth) InvalidateToken(ctx context.Context, userID string) error {
 }
 
 func (a *Auth) ValidateToken(ctx context.Context, jwtToken string) (bool, error) {
-	userID, ok := a.validator.Validate(jwtToken)
-	if !ok {
+	claimsFromToken, err := a.validator.Validate(jwtToken)
+	if err != nil {
 		return false, errors.New("invalid token")
 	}
-	session, err := a.store.GetSession(ctx, userID)
+	session, err := a.store.GetSession(ctx, claimsFromToken.UserID)
 	if err != nil {
 		return false, errors.New("no session found for that token")
 	}
@@ -97,17 +98,22 @@ func (a *Auth) ValidateToken(ctx context.Context, jwtToken string) (bool, error)
 }
 
 func (a *Auth) CreateUser(ctx context.Context, username string, password string) error {
+	fmt.Println("here")
 	_, err := a.store.GetUser(ctx, username)
-	if err != nil {
+	if err != nil && !errors.Is(err, redis.Nil) {
+		log.Println("error getting user", err)
 		return err
 	}
 
 	encryptedPassword, err := encryptPassword(password)
 	if err != nil {
+		log.Println("error encrypting password", err)
 		return err
 	}
 
 	return a.store.CreateOrSetUser(ctx, &model.User{
+		//TODO: add some uuid
+		UserID:         "SOME ID",
 		Username:       username,
 		HashedPassword: encryptedPassword,
 		LoggedIn:       false,
@@ -120,10 +126,10 @@ func (a *Auth) ListUsers(ctx context.Context) ([]*model.User, error) {
 
 func (a *Auth) DeleteUser(ctx context.Context, userID string) error {
 	user, err := a.store.GetUser(ctx, userID)
-	if err != nil {
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
-	return a.store.DeleteUser(ctx, user.UserId)
+	return a.store.DeleteUser(ctx, user.UserID)
 }
 
 func NewAuthService(validator authorization.Validator, store Store) *Auth {
