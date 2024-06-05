@@ -1,47 +1,32 @@
 package main
 
 import (
-	"bobbox/internal/commands"
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
-)
 
-var (
-	UserID string
+	"bobbox/internal/commands"
 )
 
 func main() {
-	loginCmd := flag.NewFlagSet("login", flag.ExitOnError)
-	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
-	syncCmd := flag.NewFlagSet("sync", flag.ExitOnError)
-	watchCmd := flag.NewFlagSet("watch", flag.ExitOnError)
+	initCmd := flag.NewFlagSet("watch", flag.ExitOnError)
 
 	if len(os.Args) < 2 {
-		fmt.Println("expected 'login', 'init', 'sync', or 'watch' subcommands")
+		slog.Error("expected 'watch'")
 		os.Exit(1)
 	}
 
 	switch os.Args[1] {
-	case "login":
-		commands.Login(loginCmd)
-	case "init":
+	case "watch":
 		rootPath := initCmd.String("path", "", "path to the folder we want to sync")
-		configFilePath := initCmd.String("config", "", "path to the config file")
+		configFilePath := initCmd.String("metadata_file", "", "path to store the metadata file")
+
 		initCmd.Parse(os.Args[2:])
 
 		commands.Init(rootPath, configFilePath)
-	case "sync":
-		commands.Sync(syncCmd)
-	case "watch":
-		commands.Watch(watchCmd)
 	default:
 		flag.PrintDefaults()
+		slog.Error("expected 'watch'")
 		os.Exit(1)
 	}
-}
-
-type Storage interface {
-	GetFiles()
-	PutFiles()
 }
