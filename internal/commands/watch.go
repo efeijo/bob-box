@@ -168,7 +168,7 @@ func handleRenameDeleteMoved(event fsnotify.Event, metadata *metadata.MetadataFi
 	metadata.RemoveFileOrFolder(event.Name)
 }
 
-func handleUpdate(event fsnotify.Event, metadata *metadata.MetadataFile, eventsChan chan fsnotify.Event, errChan chan error) {
+func handleUpdate(event fsnotify.Event, metadata *metadata.MetadataFile, _ chan fsnotify.Event, errChan chan error) {
 	eventInfo, err := os.Stat(event.Name)
 	if err != nil {
 		errChan <- fmt.Errorf("error handling update: %w", err)
