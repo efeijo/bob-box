@@ -27,9 +27,10 @@ func main() {
 		commands.Login(loginCmd)
 	case "init":
 		rootPath := initCmd.String("path", "", "path to the folder we want to sync")
+		configFilePath := initCmd.String("config", "", "path to the config file")
 		initCmd.Parse(os.Args[2:])
 
-		commands.Init(rootPath)
+		commands.Init(rootPath, configFilePath)
 	case "sync":
 		commands.Sync(syncCmd)
 	case "watch":
